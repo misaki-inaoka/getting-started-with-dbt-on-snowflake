@@ -1,5 +1,6 @@
 USE ROLE accountadmin;
 
+
 CREATE OR REPLACE WAREHOUSE tasty_bytes_dbt_wh
     WAREHOUSE_SIZE = 'small'
     WAREHOUSE_TYPE = 'standard'
@@ -24,19 +25,28 @@ ALTER SCHEMA tasty_bytes_dbt_db.prod SET LOG_LEVEL = 'INFO';
 ALTER SCHEMA tasty_bytes_dbt_db.prod SET TRACE_LEVEL = 'ALWAYS';
 ALTER SCHEMA tasty_bytes_dbt_db.prod SET METRIC_LEVEL = 'ALL';
 
+/*
+-- 作成済み
 CREATE OR REPLACE API INTEGRATION git_integration
   API_PROVIDER = git_https_api
   API_ALLOWED_PREFIXES = ('https://github.com/')
   ENABLED = TRUE;
+*/
 
+
+-- 要確認　外部アクセス統合が必要→外部パッケージ取得に必要
+-- ネットワークルール
 CREATE OR REPLACE NETWORK RULE tasty_bytes_dbt_db.public.dbt_network_rule
   MODE = EGRESS
   TYPE = HOST_PORT
   VALUE_LIST = ('hub.getdbt.com', 'codeload.github.com');
 
+-- 外部アクセス統合　なぜ必要か？
 CREATE OR REPLACE EXTERNAL ACCESS INTEGRATION dbt_access_integration
   ALLOWED_NETWORK_RULES = (tasty_bytes_dbt_db.public.dbt_network_rule)
   ENABLED = true;
+
+  
 
 CREATE OR REPLACE FILE FORMAT tasty_bytes_dbt_db.public.csv_ff 
 type = 'csv';
@@ -222,3 +232,24 @@ FROM @tasty_bytes_dbt_db.public.s3load/raw_pos/order_detail/;
 
 -- setup completion note
 SELECT 'tasty_bytes_dbt_db setup is now complete' AS note;
+
+
+
+
+
+
+-- パッケージの依存関係取得
+execute dbt project from workspace "USER$"."PUBLIC"."tasty_bytes_dbt" project_root='tasty_bytes_dbt_demo' args='deps --target dev' external_access_integrations = (dbt_ext_access)
+
+
+-- ワークスペース名　getting-started-with-dbt-on-snowflake
+-- 外部アクセス統合名　dbt_access_integration
+execute dbt project from workspace "USER$"."PUBLIC"."getting-started-with-dbt-on-snowflake" project_root='tasty_bytes_dbt_demo' args='deps --target dev' external_access_integrations = (dbt_access_integration)
+
+-- ロールの確認
+SELECT CURRENT_ROLE();
+show databases;
+SHOW DATABASES LIKE 'USER$';
+
+desc workspace;
+
